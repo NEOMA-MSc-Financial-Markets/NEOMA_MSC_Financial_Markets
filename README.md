@@ -38,14 +38,54 @@ Requirements
 
 	•	Python 3.x
 	•	Dependencies: yfinance, numpy, pandas, scipy, matplotlib, seaborn, statsmodels
-
 Usage
 
 	1.	Configure TICKERS, START_DATE, END_DATE, and RISK_FREE_RATE constants in the script.
 	2.	Execute the script: python portfolio_analysis.py
 	3.	Follow prompts to include/exclude stocks with extreme values.
 
+Running the Project
+
+To simplify the setup process and ensure all dependencies are correctly installed, we've provided a bash script that creates a virtual environment, installs the required packages, and runs the main Python script. Follow these steps to use it:
+Make sure you have Python 3.11 installed on your system.
+
+Save the following script as run_portfolio_optimization.sh in the same directory as your main_portfolio_optimization.py file:
+bash
+
+	#!/bin/bash
+
+	# Create a virtual environment
+	python3.11 -m venv portfolio_env
+
+	# Activate the virtual environment
+	source portfolio_env/bin/activate
+
+	# Upgrade pip
+	pip install --upgrade pip
+
+	# Install required libraries
+	pip install yfinance numpy pandas scipy matplotlib seaborn statsmodels pandas-datareader
+
+	# Run the Python script
+	python3.11 main_portfolio_optimization.py
+
+	# Deactivate the virtual environment
+	deactivate
+
+Make the script executable by running:
+
+	chmod +x run_portfolio_optimization.sh
+
+Run the script:
+
+	./run_portfolio_optimization.sh
+
+This script will create a virtual environment, install all necessary dependencies, run the main Python script, and then deactivate the virtual environment.
+
+Note: If you're using Windows, you'll need to modify the script or use a bash emulator like Git Bash to run this script.
+
 Core Functions
+
 	•	compute_stock_metrics(): Calculates returns, volatilities, and correlation matrix
 	•	optimize_portfolio(): Computes GMVP and MSR portfolios
 	•	calculate_efficient_frontier(): Generates efficient frontier points
@@ -58,6 +98,7 @@ Core Functions
 Output
 
 The script generates a series of plots and prints detailed portfolio metrics, including:
+
 	•	Historical price charts
 	•	Correlation heatmaps
 	•	Portfolio weight distributions
