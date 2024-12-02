@@ -1,4 +1,7 @@
 # NEOMA_MSC_Financial_Markets
+
+<img width="967" alt="Screenshot 2024-12-02 at 18 10 47" src="https://github.com/user-attachments/assets/063a1e99-7878-41d5-b6a0-8e880ab636ad">
+
 This Python project implements a comprehensive portfolio optimization tool for a 5-stock portfolio. It fetches historical data, calculates key metrics like GMVP and MSR, and visualizes results. The script incorporates advanced concepts such as Fama-French 3-factor model, efficient frontier, and SML analysis, making it suitable for asset-management.
 
 NEOMA World Growth Portfolio (NWGP) Optimization Tool
@@ -36,7 +39,7 @@ Key Features
 
 Requirements
 
-	•	Python 3.x
+	•	Python 3.11 (This code won't work in python3.12 env)
 	•	Dependencies: yfinance, numpy, pandas, scipy, matplotlib, seaborn, statsmodels
 Usage
 
@@ -97,6 +100,13 @@ Core Functions
 
 Output
 
+Printing in terminal : 
+
+<img width="653" alt="Screenshot 2024-12-02 at 19 17 56" src="https://github.com/user-attachments/assets/d109d002-80c4-4813-8358-4dac93f3bd80">
+<img width="523" alt="Screenshot 2024-12-02 at 19 18 17" src="https://github.com/user-attachments/assets/82b76d56-53a8-4f11-b240-06c24f47b052">
+
+
+
 The script generates a series of plots and prints detailed portfolio metrics, including:
 
 	•	Historical price charts
@@ -105,6 +115,20 @@ The script generates a series of plots and prints detailed portfolio metrics, in
 	•	Risk-return scatter plots with efficient frontier
 	•	Fama-French factor analysis results
 	•	Security Market Line analysis
+
+Risk-return scatter plots with efficient frontier with GMVP (GLOBAL MINIMUM VARIANCE PORTFOLIO) & (MSR MAXIMUM SHARPE RATIO)
+
+![Exp Return-Volatitlities](https://github.com/user-attachments/assets/47f44489-b34b-41bb-be2a-882a2d12abc9)
+
+
+Portfolio weight distributions
+
+![Portfolio_weight_distributions](https://github.com/user-attachments/assets/8f2c3a7b-2eec-46c2-9ea2-73b0a0cc0e3c)
+
+Heatmap Correlation Matrix
+
+![Figure 2024-12-02 191338](https://github.com/user-attachments/assets/1711b5e0-981f-40af-ab97-ae036b1f2393)
+
 
 Note
 This report, created by NEOMA Business School students for the Financial Data Analytics & Programming course, is for educational and research purposes in the context of advanced financial analysis and portfolio management purposes only. It is hypothetical and does not constitute financial or investment advice or an invitation to invest.
