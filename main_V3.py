@@ -1,13 +1,24 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Sat Nov 30 18:32:19 2024
-@author: adrienpicard
+Comprehensive Stock Portfolio Optimization Script
+-------------------------------------------------
+Created: Sat Nov 30 18:32:19 2024
+Author: Adrien Picard
+
+Description:
+This script performs portfolio optimization for a set of stocks using GMVP 
+(Global Minimum Variance Portfolio) and MSR (Maximum Sharpe Ratio) techniques. 
+It provides exploratory data analysis, efficient frontier visualization, 
+correlation heatmaps, advanced financial metrics (Fama-French 3-Factor modeling), 
+and performance evaluation metrics like Jensen's Alpha.
 """
 
+import logging
 import yfinance as yf
 import numpy as np
 import pandas as pd
+import json
 from datetime import datetime
 import scipy.optimize as sco
 import matplotlib.pyplot as plt
@@ -20,18 +31,51 @@ warnings.filterwarnings("ignore", category=RuntimeWarning) #Use to avoid Warning
 warnings.filterwarnings("ignore", category=FutureWarning)
 warnings.filterwarnings("ignore", category=UserWarning)
 
-# Constants
-TICKERS = ['ML.PA', 'HDB', 'CEG', 'RTX', '8031.T']
-START_DATE = "2019-01-01"
-END_DATE = datetime.today().strftime('%Y-%m-%d')
-RISK_FREE_RATE = 0.05
 
-PATH_TO_PLOTS = "./plots/" #Path where the plots are going to be stored
+def load_config(config_file="config.json"):
+    """
+    Loads configuration parameters from a JSON file.
+
+    Args:
+        config_file (str, optional): Path to the JSON configuration file. Defaults to "config.json".
+
+    Returns:
+        dict: Dictionary containing configuration parameters.
+    """
+    try:
+        with open(config_file, "r") as file:
+            config = json.load(file)
+
+        # Handle optional or dynamic values
+        if config["end_date"] is None:
+            config["end_date"] = datetime.today().strftime('%Y-%m-%d')
+
+        return config
+    except FileNotFoundError:
+        raise FileNotFoundError(f"Configuration file '{config_file}' not found.")
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Error parsing JSON configuration file: {e}")
+
+config = load_config()
+
+# Constants
+TICKERS = config["tickers"]
+START_DATE = config["start_date"]
+END_DATE = config["end_date"]
+RISK_FREE_RATE = config["risk_free_rate"]
+PATH_TO_PLOTS = config["output_path"]
+BASE_CURRENCY = config["base_currency"]
 
 import sys
 import subprocess
 
 def install_required_packages():
+    """
+    Installs required Python packages for the script if they are not already installed.
+    
+    Raises:
+        RuntimeError: If the Python version is lower than 3.11.
+    """
     required_packages = ['yfinance', 'numpy', 'pandas', 'scipy', 'matplotlib', 'seaborn', 'statsmodels']
     for package in required_packages:
         try:
@@ -42,15 +86,38 @@ def install_required_packages():
     if sys.version_info < (3, 11):
         raise RuntimeError("This script requires Python 3.11 or newer")
 
-# Call this function at the beginning of your script to run this script in good conditions
 install_required_packages()
+
 
 # Utility Functions
 def answer_input(prompt, default="yes"):
+    """
+    Prompts the user for input with a default value.
+
+    Args:
+        prompt (str): The question or message displayed to the user.
+        default (str, optional): The default value returned if no input is provided. Defaults to "yes".
+
+    Returns:
+        str: The user's response or the default value.
+    """
     print(prompt)
     return input().strip().lower() or default
 
+
 def fetch_stock_data(ticker, start_date, end_date):
+    """
+    Fetches historical adjusted closing prices for a specific stock.
+
+    Args:
+        ticker (str): The stock's ticker symbol.
+        start_date (str): The start date for fetching data in 'YYYY-MM-DD' format.
+        end_date (str): The end date for fetching data in 'YYYY-MM-DD' format.
+
+    Returns:
+        pd.Series: Time series of adjusted closing prices.
+        None: If no data is available or an error occurs.
+    """
     try:
         data = yf.download(ticker, start=start_date, end=end_date, progress=False)['Adj Close']
         return data if not data.empty else None
@@ -59,12 +126,39 @@ def fetch_stock_data(ticker, start_date, end_date):
         return None
 
 def get_company_name(ticker):
+    """
+    Retrieves the company's short name for a given stock ticker.
+
+    Args:
+        ticker (str): The stock's ticker symbol.
+
+    Returns:
+        str: The company's short name, or the ticker if the name cannot be retrieved.
+    """
     try:
         return yf.Ticker(ticker).info.get('shortName', ticker)
     except Exception:
         return ticker
 
 def check_tickers_fetching(tickers, start_date, end_date):
+    """
+    Validates and fetches historical data for a list of stock tickers.
+
+    Args:
+        tickers (list of str): List of stock ticker symbols.
+        start_date (str): The start date for fetching data in 'YYYY-MM-DD' format.
+        end_date (str): The end date for fetching data in 'YYYY-MM-DD' format.
+
+    Returns:
+        tuple:
+            - list of str: Valid stock tickers with available data.
+            - dict: Dictionary mapping tickers to their time series data.
+            - list of str: Company names corresponding to valid tickers.
+            - pd.DataFrame: Combined DataFrame of all valid tickers' adjusted closing prices.
+
+    Raises:
+        ValueError: If no valid data is downloaded for the provided tickers.
+    """
     valid_tickers = []
     data_dict = {}
     company_names = []
@@ -87,6 +181,16 @@ def check_tickers_fetching(tickers, start_date, end_date):
     return valid_tickers, data_dict, company_names, data
 
 def filter_extreme_values(metrics_df, SPREAD=1.8):
+    """
+    Filters out stocks with extreme annual returns or volatilities.
+
+    Args:
+        metrics_df (pd.DataFrame): DataFrame containing annual return and volatility metrics.
+        SPREAD (float, optional): Multiplier for the mean to determine extreme values. Defaults to 1.8.
+
+    Returns:
+        pd.DataFrame: Filtered DataFrame with extreme values excluded.
+    """
     return_threshold = metrics_df["Annual_Return%"].mean() * SPREAD
     volatility_threshold = metrics_df["Annual_Volatility%"].mean() * SPREAD
     
@@ -101,6 +205,21 @@ def filter_extreme_values(metrics_df, SPREAD=1.8):
     return metrics_df
 
 def compute_stock_metrics(tickers, start_date, end_date):
+    """
+    Computes financial metrics such as annual return and volatility for a list of stocks.
+
+    Args:
+        tickers (list of str): List of stock ticker symbols.
+        start_date (str): The start date for fetching data in 'YYYY-MM-DD' format.
+        end_date (str): The end date for fetching data in 'YYYY-MM-DD' format.
+
+    Returns:
+        dict: A dictionary containing:
+            - "Metrics_DataFrame" (pd.DataFrame): Annual return and volatility metrics.
+            - "Correlation_Matrix" (pd.DataFrame): Correlation matrix of daily returns.
+            - "Covariance_Matrix" (pd.DataFrame): Covariance matrix of daily returns.
+            - "Raw Data" (pd.DataFrame): Adjusted closing prices of the valid stocks.
+    """
     valid_tickers, data_dict, company_names, data = check_tickers_fetching(tickers, start_date, end_date)
     daily_returns = data.pct_change()
     
@@ -129,6 +248,13 @@ def compute_stock_metrics(tickers, start_date, end_date):
 
 # Function to print portfolio weights in a readable format
 def print_portfolio_weights(weights, tickers):
+    """
+    Prints portfolio weights in a tabular format.
+
+    Args:
+        weights (list of float): Portfolio weights for each stock.
+        tickers (list of str): Stock ticker symbols corresponding to the weights.
+    """
     print("\nPortfolio Weights:")
     print(f"{'Ticker':<10}{'Weight (%)':<15}")
     print("-" * 25)
@@ -137,12 +263,39 @@ def print_portfolio_weights(weights, tickers):
         
 # Portfolio Optimization Functions
 def portfolio_metrics(weights, returns, cov_matrix):
+    """
+    Calculates portfolio return, volatility, and Sharpe ratio.
+
+    Args:
+        weights (np.ndarray): Portfolio weights.
+        returns (np.ndarray): Annualized returns for each stock.
+        cov_matrix (np.ndarray): Covariance matrix of stock returns.
+
+    Returns:
+        tuple:
+            - float: Portfolio return.
+            - float: Portfolio volatility.
+            - float: Sharpe ratio of the portfolio.
+    """
     portfolio_return = np.dot(weights, returns)
     portfolio_volatility = np.sqrt(np.dot(weights.T, np.dot(cov_matrix, weights)))
     sharpe_ratio = (portfolio_return - RISK_FREE_RATE) / portfolio_volatility
     return portfolio_return, portfolio_volatility, sharpe_ratio
 
 def optimize_portfolio(mean_returns, cov_matrix, opt_type):
+    """
+    Optimizes portfolio weights based on the chosen optimization type.
+
+    Args:
+        mean_returns (np.ndarray): Annualized mean returns for each stock.
+        cov_matrix (np.ndarray): Covariance matrix of stock returns.
+        opt_type (str): Optimization type ("GMVP" for Global Minimum Variance Portfolio or "MSR" for Maximum Sharpe Ratio).
+
+    Returns:
+        tuple:
+            - np.ndarray: Optimized portfolio weights.
+            - float: Objective function value (e.g., portfolio volatility for GMVP).
+    """
     num_assets = len(mean_returns)
     constraints = {"type": "eq", "fun": lambda x: np.sum(x) - 1}
     bounds = tuple((0.0, 1.0) for _ in range(num_assets))
@@ -156,6 +309,19 @@ def optimize_portfolio(mean_returns, cov_matrix, opt_type):
     return result.x, result.fun
 
 def calculate_efficient_frontier(mean_returns, cov_matrix, num_points=100):
+    """
+    Computes the efficient frontier by varying target returns.
+
+    Args:
+        mean_returns (np.ndarray): Annualized mean returns for each stock.
+        cov_matrix (np.ndarray): Covariance matrix of stock returns.
+        num_points (int, optional): Number of points to compute on the efficient frontier. Defaults to 100.
+
+    Returns:
+        tuple:
+            - np.ndarray: Target returns.
+            - np.ndarray: Corresponding portfolio volatilities.
+    """
     target_returns = np.linspace(mean_returns.min(), mean_returns.max(), num_points)
     efficient_volatilities = []
     
@@ -180,6 +346,20 @@ def calculate_efficient_frontier(mean_returns, cov_matrix, num_points=100):
 
 
 def simulate_portfolios(returns, cov_matrix, num_portfolios=2000):
+    """
+    Simulates random portfolios for Monte Carlo analysis.
+
+    Args:
+        returns (np.ndarray): Annualized mean returns for each stock.
+        cov_matrix (np.ndarray): Covariance matrix of stock returns.
+        num_portfolios (int, optional): Number of random portfolios to simulate. Defaults to 2000.
+
+    Returns:
+        tuple:
+            - np.ndarray: Simulated portfolio returns.
+            - np.ndarray: Simulated portfolio volatilities.
+            - np.ndarray: Simulated Sharpe ratios.
+    """
     num_assets = len(returns)
     weights = np.random.rand(num_portfolios, num_assets)
     weights /= np.sum(weights, axis=1)[:, np.newaxis]
@@ -192,6 +372,19 @@ def simulate_portfolios(returns, cov_matrix, num_portfolios=2000):
 
 
 def create_plot(figsize=(12, 8), title="", xlabel="", ylabel="", dpi=300):
+    """
+    Creates a styled Matplotlib plot with basic configurations.
+
+    Args:
+        figsize (tuple, optional): Figure dimensions (width, height). Defaults to (12, 8).
+        title (str, optional): Title of the plot. Defaults to "".
+        xlabel (str, optional): Label for the X-axis. Defaults to "".
+        ylabel (str, optional): Label for the Y-axis. Defaults to "".
+        dpi (int, optional): Resolution of the plot. Defaults to 300.
+
+    Returns:
+        matplotlib.axes.Axes: The configured axes object.
+    """
     plt.figure(figsize=figsize, dpi=dpi)
     sns.set_style("whitegrid")
     plt.title(title, fontsize=16, pad=20)
@@ -201,6 +394,17 @@ def create_plot(figsize=(12, 8), title="", xlabel="", ylabel="", dpi=300):
     return plt.gca()
 
 def finalize_plot(ax, filename, legend=True, legend_title=None, tight_layout=True, show=True):
+    """
+    Finalizes a Matplotlib plot by adding legends, saving to file, and optionally displaying it.
+
+    Args:
+        ax (matplotlib.axes.Axes): The plot's axes object.
+        filename (str): Filename to save the plot.
+        legend (bool, optional): Whether to include a legend. Defaults to True.
+        legend_title (str, optional): Title for the legend. Defaults to None.
+        tight_layout (bool, optional): Whether to apply a tight layout. Defaults to True.
+        show (bool, optional): Whether to display the plot. Defaults to True.
+    """
     if legend:
         if legend_title:
             ax.legend(title=legend_title, fontsize=10, loc="best", frameon=True, fancybox=True, framealpha=0.6)
@@ -212,6 +416,18 @@ def finalize_plot(ax, filename, legend=True, legend_title=None, tight_layout=Tru
     plt.show()
 
 def fetch_and_convert_data(tickers, start_date, end_date, base_currency="USD"):
+    """
+    Fetches historical stock prices and converts them to a specified base currency.
+
+    Args:
+        tickers (list of str): List of stock ticker symbols.
+        start_date (str): Start date for fetching data in 'YYYY-MM-DD' format.
+        end_date (str): End date for fetching data in 'YYYY-MM-DD' format.
+        base_currency (str, optional): Target currency for conversion. Defaults to "USD".
+
+    Returns:
+        dict: A dictionary where keys are tickers and values are time series of converted prices.
+    """
     data_dict = {}
     conversion_rates = {"USD": 1.0, "EUR": 1.1, "JPY": 0.008, "GBP": 1.25}
     
@@ -235,6 +451,16 @@ def fetch_and_convert_data(tickers, start_date, end_date, base_currency="USD"):
 
 # Visualization Functions
 def plot_historical_prices(metrics_df, start_date, end_date, base_currency="USD", title="Historical Prices (Converted)"):
+    """
+    Plots historical stock prices converted to a specified currency.
+
+    Args:
+        metrics_df (pd.DataFrame): DataFrame containing stock tickers and company names.
+        start_date (str): Start date for fetching data in 'YYYY-MM-DD' format.
+        end_date (str): End date for fetching data in 'YYYY-MM-DD' format.
+        base_currency (str, optional): Target currency for price conversion. Defaults to "USD".
+        title (str, optional): Title of the plot. Defaults to "Historical Prices (Converted)".
+    """
     ax = create_plot(figsize=(14, 8), title=title, xlabel="Date", ylabel=f"Adjusted Price ({base_currency})")
     
     tickers = metrics_df['Stock_Ticker'].tolist()
@@ -251,6 +477,14 @@ def plot_historical_prices(metrics_df, start_date, end_date, base_currency="USD"
     finalize_plot(ax, "Historical_prices", legend_title="Stocks")
 
 def plot_correlation_heatmap(correlation_matrix, tickers, title="Correlation Heatmap"):
+    """
+    Plots a heatmap of the correlation matrix for the given stocks.
+
+    Args:
+        correlation_matrix (pd.DataFrame): Correlation matrix of stock returns.
+        tickers (list of str): Stock ticker symbols.
+        title (str, optional): Title of the plot. Defaults to "Correlation Heatmap".
+    """
     ax = create_plot(figsize=(10, 8), title=title)
     sns.heatmap(correlation_matrix, annot=True, cmap="coolwarm", fmt=".2f",
                 xticklabels=tickers, yticklabels=tickers, linewidths=0.5,
@@ -260,6 +494,17 @@ def plot_correlation_heatmap(correlation_matrix, tickers, title="Correlation Hea
     finalize_plot(ax, "Correlation_heatmap", legend=False)
 
 def plot_gmvp_msr_weights(tickers, company_names, gmvp_weights, msr_weights, gmvp_performance, msr_performance):
+    """
+    Visualizes the portfolio weights for GMVP and MSR optimization.
+
+    Args:
+        tickers (list of str): List of stock ticker symbols.
+        company_names (list of str): List of corresponding company names.
+        gmvp_weights (np.ndarray): Optimized weights for the GMVP portfolio.
+        msr_weights (np.ndarray): Optimized weights for the MSR portfolio.
+        gmvp_performance (tuple): Performance metrics for GMVP (return, volatility).
+        msr_performance (tuple): Performance metrics for MSR (return, volatility).
+    """
     ax = create_plot(figsize=(12, 8), title="Portfolio Weights for GMVP and MSR", xlabel="Stocks", ylabel="Weight (%)")
     
     labels = [f"{name} ({ticker})" for name, ticker in zip(company_names, tickers)]
@@ -296,6 +541,21 @@ def plot_gmvp_msr_weights(tickers, company_names, gmvp_weights, msr_weights, gmv
 def plot_return_vs_risk_portfolio_GMVP_MSR(stock_df, simulated_returns, simulated_volatilities, simulated_sharpe_ratios,
                                            efficient_returns, efficient_volatilities, msr_return, msr_volatility,
                                            min_risk_return, min_risk_volatility):
+    """
+    Plots the risk-return characteristics of the portfolio and individual assets.
+
+    Args:
+        stock_df (pd.DataFrame): DataFrame containing stock return and volatility metrics.
+        simulated_returns (np.ndarray): Simulated portfolio returns.
+        simulated_volatilities (np.ndarray): Simulated portfolio volatilities.
+        simulated_sharpe_ratios (np.ndarray): Simulated Sharpe ratios.
+        efficient_returns (np.ndarray): Returns on the efficient frontier.
+        efficient_volatilities (np.ndarray): Volatilities on the efficient frontier.
+        msr_return (float): Return of the Maximum Sharpe Ratio portfolio.
+        msr_volatility (float): Volatility of the Maximum Sharpe Ratio portfolio.
+        min_risk_return (float): Return of the Global Minimum Variance Portfolio.
+        min_risk_volatility (float): Volatility of the Global Minimum Variance Portfolio.
+    """
     ax = create_plot(figsize=(14, 10), title="Expected Return vs Risk for Portfolio and Individual Assets",
                      xlabel="Risk (Volatility %)", ylabel="Expected Return (%)")
     
@@ -338,6 +598,16 @@ def plot_return_vs_risk_portfolio_GMVP_MSR(stock_df, simulated_returns, simulate
     finalize_plot(ax, "Return_vs_risk_portfolio_GMVP_MSR")
 
 def fetch_fama_french_factors(start_date, end_date):
+    """
+    Fetches Fama-French 3-factor data for the specified date range.
+
+    Args:
+        start_date (str): Start date for the data in 'YYYY-MM-DD' format.
+        end_date (str): End date for the data in 'YYYY-MM-DD' format.
+
+    Returns:
+        pd.DataFrame: Daily Fama-French factors (MKT-RF, SMB, HML, RF).
+    """
     ff3_data = pdr.DataReader('F-F_Research_Data_Factors_daily', 'famafrench', start_date, end_date)[0]
     ff3_data.index = pd.to_datetime(ff3_data.index)
     ff3_data = ff3_data.rename(columns={'Mkt-RF': 'MKT-RF', 'HML': 'HML', 'SMB': 'SMB', 'RF': 'RF'})
@@ -345,6 +615,17 @@ def fetch_fama_french_factors(start_date, end_date):
     return ff3_data
 
 def compute_fama_french_3_factors(portfolio_returns, ff3_factors, portfolio_name="Portfolio"):
+    """
+    Performs Fama-French 3-factor regression on the portfolio's excess returns.
+
+    Args:
+        portfolio_returns (pd.Series): Portfolio returns over time.
+        ff3_factors (pd.DataFrame): Fama-French 3-factor data.
+        portfolio_name (str, optional): Name of the portfolio. Defaults to "Portfolio".
+
+    Outputs:
+        Plots of regression coefficients and fitted vs. actual returns.
+    """
     common_dates = portfolio_returns.index.intersection(ff3_factors.index)
     portfolio_returns = portfolio_returns.loc[common_dates]
     ff3_factors = ff3_factors.loc[common_dates]
@@ -385,6 +666,16 @@ def compute_fama_french_3_factors(portfolio_returns, ff3_factors, portfolio_name
     finalize_plot(ax, "fama_french_3_fig3")
 
 def plot_sml_with_dynamic_gmvp(metrics_df, gmvp_weights, market_ticker='URTH', start_date=START_DATE, end_date=END_DATE):
+    """
+    Plots the Security Market Line (SML) with the GMVP's beta and return.
+
+    Args:
+        metrics_df (pd.DataFrame): DataFrame containing stock metrics (beta, return, volatility).
+        gmvp_weights (np.ndarray): Weights for the GMVP portfolio.
+        market_ticker (str, optional): Ticker symbol for the market index. Defaults to 'URTH'.
+        start_date (str): Start date for fetching data in 'YYYY-MM-DD' format.
+        end_date (str): End date for fetching data in 'YYYY-MM-DD' format.
+    """
     try:
         # Download and prepare market data
         market_data = yf.download(market_ticker, start=start_date, end=end_date, progress=False)        
@@ -449,6 +740,24 @@ def plot_sml_with_dynamic_gmvp(metrics_df, gmvp_weights, market_ticker='URTH', s
         print(f"Error in plot_sml_with_dynamic_gmvp: {e}")
 
 def evaluate_gmvp_performance(gmvp_weights, gmvp_return, gmvp_volatility, cov_matrix, risk_free_rate, market_ticker, start_date, end_date, data, tickers):
+    """
+    Evaluates the performance of the GMVP portfolio using various metrics.
+
+    Args:
+        gmvp_weights (np.ndarray): Weights of the GMVP portfolio.
+        gmvp_return (float): Return of the GMVP portfolio.
+        gmvp_volatility (float): Volatility of the GMVP portfolio.
+        cov_matrix (np.ndarray): Covariance matrix of stock returns.
+        risk_free_rate (float): Risk-free rate used for calculations.
+        market_ticker (str): Ticker symbol for the market index.
+        start_date (str): Start date for fetching data in 'YYYY-MM-DD' format.
+        end_date (str): End date for fetching data in 'YYYY-MM-DD' format.
+        data (pd.DataFrame): Raw data of stock prices.
+        tickers (list of str): List of stock tickers in the portfolio.
+
+    Returns:
+        dict: Performance metrics including Sharpe ratio, beta, Jensen's alpha, and more.
+    """
     try:
         market_data = yf.download(market_ticker, start=start_date, end=end_date, progress=False)["Adj Close"]
         if market_data.empty:
@@ -495,6 +804,16 @@ def evaluate_gmvp_performance(gmvp_weights, gmvp_return, gmvp_volatility, cov_ma
         return {}
 
 def main():
+    """
+    Executes the end-to-end portfolio optimization and analysis workflow:
+    - Computes stock metrics.
+    - Optimizes portfolios for GMVP and MSR.
+    - Evaluates performance and generates plots.
+    - Prints key results and metrics.
+
+    Outputs:
+        Results and visualizations in the console and saved files.
+    """
     stock_metrics = compute_stock_metrics(TICKERS, START_DATE, END_DATE)
     
     metrics_df = stock_metrics["Metrics_DataFrame"]
