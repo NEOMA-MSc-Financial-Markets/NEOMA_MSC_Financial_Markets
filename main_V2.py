@@ -384,52 +384,69 @@ def compute_fama_french_3_factors(portfolio_returns, ff3_factors, portfolio_name
     factor_stats[['Mean', 'Std Dev']].plot(kind='bar', ax=ax, edgecolor='black')
     finalize_plot(ax, "fama_french_3_fig3")
 
-
 def plot_sml_with_dynamic_gmvp(metrics_df, gmvp_weights, market_ticker='URTH', start_date=START_DATE, end_date=END_DATE):
     try:
-        market_data = yf.download(market_ticker, start=start_date, end=end_date, progress=False)['Adj Close']
+        # Download and prepare market data
+        market_data = yf.download(market_ticker, start=start_date, end=end_date, progress=False)        
         if market_data.empty:
-            raise ValueError(f"No data found for {market_ticker}. Check the ticker.")
+            raise ValueError("No data found for market ticker.")
+        
+        market_daily_returns = market_data['Adj Close'].pct_change().dropna()
+        market_annual_return = ((1 + market_daily_returns.mean()) ** 252) - 1
+
+        # Calculate betas for stocks
+        stock_betas = []
+        for ticker in metrics_df['Stock_Ticker']:
+            stock_data = yf.download(ticker, start=start_date, end=end_date, progress=False)['Adj Close'].pct_change().dropna()
+            
+            common_dates = stock_data.index.intersection(market_daily_returns.index)
+            stock_data = stock_data.loc[common_dates]
+            market_returns = market_daily_returns.loc[common_dates]
+            
+            X = sm.add_constant(market_returns)
+            model = sm.OLS(stock_data, X).fit()
+            stock_betas.append(model.params[1])
+        
+        metrics_df['Beta'] = stock_betas
+        gmvp_beta = np.dot(gmvp_weights, metrics_df['Beta'])
+        gmvp_return = np.dot(gmvp_weights, metrics_df['Annual_Return%']) / 100
+
+        # Extract the scalar value from market_annual_return
+        market_annual_return_value = market_annual_return.iloc[0]
+
+        # Prepare data for SML
+        betas = np.linspace(-0.5, 2.5, 100)
+        sml_returns = RISK_FREE_RATE + betas * (market_annual_return_value - RISK_FREE_RATE)
+
+        # Plot SML
+        ax = create_plot(title="Security Market Line (SML) with GMVP", xlabel="Beta (Systematic Risk)", ylabel="Expected Return (%)")
+        ax.plot(betas, sml_returns * 100, label="SML", linestyle="--", color="blue")
+
+        # Plot GMVP point with label
+        ax.scatter(gmvp_beta, gmvp_return * 100, color="red", s=100, label="GMVP")
+        ax.annotate(f"GMVP ({gmvp_return:.2%})", 
+                    (gmvp_beta, gmvp_return * 100), 
+                    xytext=(5, 5), 
+                    textcoords='offset points', 
+                    color='red', 
+                    fontsize=8)
+
+        # Plot individual stocks with labels
+        for _, row in metrics_df.iterrows():
+            ax.scatter(row['Beta'], row['Annual_Return%'], color='orange', s=50)
+            ax.annotate(row['Stock_Ticker'], 
+                        (row['Beta'], row['Annual_Return%']), 
+                        xytext=(5, 5), 
+                        textcoords='offset points', 
+                        color='black', 
+                        fontsize=8)
+
+        ax.axhline(y=RISK_FREE_RATE * 100, color="green", linestyle="-", label="Risk-Free Rate")
+        ax.scatter([], [], color='orange', s=50, label='Stocks')# Add a single point for stocks in the legend
+        ax.legend(loc='best', fontsize=8)   # Adjust legend
+        finalize_plot(ax, "sml_with_dynamic_gmvp")
     except Exception as e:
-        print(f"Error fetching market data: {e}")
-        return
-
-    market_daily_returns = market_data.pct_change().dropna()
-    market_annual_return = ((1 + market_daily_returns.mean()) ** 252) - 1
-    
-    stock_betas = []
-    for _, row in metrics_df.iterrows():
-        stock_ticker = row['Stock_Ticker']
-        stock_data = yf.download(stock_ticker, start=start_date, end=end_date, progress=False)['Adj Close'].pct_change().dropna()
-        common_dates = stock_data.index.intersection(market_daily_returns.index)
-        stock_data = stock_data.loc[common_dates]
-        market_returns = market_daily_returns.loc[common_dates]
-        X = sm.add_constant(market_returns)
-        model = sm.OLS(stock_data, X).fit()
-        stock_betas.append(model.params[1])
-    
-    metrics_df['Beta'] = stock_betas
-    gmvp_beta = np.dot(gmvp_weights, metrics_df['Beta'])
-    gmvp_return = np.dot(gmvp_weights, metrics_df['Annual_Return%']) / 100
-    
-    betas = np.linspace(-0.5, 2.5, 100)
-    sml_returns = RISK_FREE_RATE + betas * (market_annual_return - RISK_FREE_RATE)
-    
-    ax = create_plot(figsize=(12, 8), title="Security Market Line (SML) with GMVP", 
-                     xlabel="Beta (Systematic Risk)", ylabel="Expected Return (%)")
-    ax.plot(betas, sml_returns * 100, label="Security Market Line (SML)", linestyle="--", color="blue", linewidth=2)
-    ax.scatter(gmvp_beta, gmvp_return * 100, color="red", label=f"GMVP ({gmvp_return:.2%})", s=100, zorder=5)
-    ax.text(gmvp_beta + 0.05, gmvp_return * 100 + 0.5, f"GMVP ({gmvp_return:.2%})", fontsize=10)
-    
-    for _, row in metrics_df.iterrows():
-        stock_return = row['Annual_Return%'] / 100
-        stock_beta = row['Beta']
-        ax.scatter(stock_beta, stock_return * 100, color='orange', zorder=5)
-        ax.text(stock_beta + 0.05, stock_return * 100 + 0.5, row['Stock_Ticker'], fontsize=8)
-    
-    ax.axhline(y=RISK_FREE_RATE * 100, color="green", linestyle="-", label="Risk-Free Rate")
-    finalize_plot(ax, "sml_with_dynamic_gmvp")
-
+        print(f"Error in plot_sml_with_dynamic_gmvp: {e}")
 
 def evaluate_gmvp_performance(gmvp_weights, gmvp_return, gmvp_volatility, cov_matrix, risk_free_rate, market_ticker, start_date, end_date, data, tickers):
     try:
@@ -523,7 +540,7 @@ def main():
             "Stock_return%": metrics_df['Annual_Return%'],
             "Stock_volatility%": metrics_df["Annual_Volatility%"]
         })
-
+        
         performance_metrics = evaluate_gmvp_performance(
         gmvp_weights=gmvp_weights,
         gmvp_return=gmvp_return,
@@ -571,9 +588,10 @@ def main():
         portfolio_returns = pd.Series(portfolio_daily_returns.values, index=pd.date_range(start=START_DATE, periods=len(portfolio_daily_returns), freq='B'))
         
         compute_fama_french_3_factors(portfolio_returns, fetch_fama_french_factors(START_DATE, END_DATE), portfolio_name="Sample Portfolio")
-       
+        
         plot_sml_with_dynamic_gmvp(metrics_df, gmvp_weights, start_date=START_DATE, end_date=END_DATE, market_ticker='URTH')
         
+
         print(f"\nProject NEOMA Business School - MSc International Finance, FMRM Track")
     except ValueError as e:
         print(f"Optimization failed: {e}. Check input data or constraints.")
