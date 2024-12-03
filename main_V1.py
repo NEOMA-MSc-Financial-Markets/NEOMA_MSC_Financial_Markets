@@ -12,8 +12,6 @@ Plots stocks, risk-free asset, GMVP, MSR, Efficient Frontier, and CML with prope
 Prints detailed portfolio metrics, including returns, volatilities, correlations, and weights.
 """
 
-
-
 import yfinance as yf 
 import numpy as np
 import pandas as pd
