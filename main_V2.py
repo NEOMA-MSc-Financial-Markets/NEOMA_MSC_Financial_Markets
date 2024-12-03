@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 """
 Created on Sat Nov 30 18:32:19 2024
-
 @author: adrienpicard
 """
 
@@ -17,7 +16,7 @@ import statsmodels.api as sm
 from pandas_datareader import data as pdr
 import warnings
 
-warnings.filterwarnings("ignore", category=RuntimeWarning)
+warnings.filterwarnings("ignore", category=RuntimeWarning) #Use to avoid Warnings and Noisy printings from the algos
 warnings.filterwarnings("ignore", category=FutureWarning)
 warnings.filterwarnings("ignore", category=UserWarning)
 
@@ -26,6 +25,8 @@ TICKERS = ['ML.PA', 'HDB', 'CEG', 'RTX', '8031.T']
 START_DATE = "2019-01-01"
 END_DATE = datetime.today().strftime('%Y-%m-%d')
 RISK_FREE_RATE = 0.05
+
+PATH_TO_PLOTS = "./plots/" #Path where the plots are going to be stored
 
 import sys
 import subprocess
@@ -38,12 +39,11 @@ def install_required_packages():
         except ImportError:
             print(f"Installing {package}...")
             subprocess.check_call([sys.executable, "-m", "pip", "install", package])
+    if sys.version_info < (3, 11):
+        raise RuntimeError("This script requires Python 3.11 or newer")
 
-# Call this function at the beginning of your script
+# Call this function at the beginning of your script to run this script in good conditions
 install_required_packages()
-
-if sys.version_info < (3, 11):
-    raise RuntimeError("This script requires Python 3.11 or newer")
 
 # Utility Functions
 def answer_input(prompt, default="yes"):
@@ -68,28 +68,22 @@ def check_tickers_fetching(tickers, start_date, end_date):
     valid_tickers = []
     data_dict = {}
     company_names = []
-    
-    # First, collect all valid data
-    for ticker in tickers:
+
+    for ticker in tickers:# First, collect all valid data
         data = fetch_stock_data(ticker, start_date, end_date)
         if data is not None:
             valid_tickers.append(ticker)
             data_dict[ticker] = data
             company_names.append(get_company_name(ticker))
-    
     if not valid_tickers:
         raise ValueError("No valid data downloaded for the provided tickers.")
+   
+    data = data_dict[valid_tickers[0]] # Create DataFrame from the first valid ticker's data
     
-    # Create DataFrame from the first valid ticker's data
-    data = data_dict[valid_tickers[0]]
-    
-    # Join other tickers' data
-    for ticker in valid_tickers[1:]:
+    for ticker in valid_tickers[1:]:# Join other tickers' data
         data = pd.concat([data, data_dict[ticker]], axis=1)
-    
-    # Set column names
-    data.columns = valid_tickers
-    
+   
+    data.columns = valid_tickers # Set column names
     return valid_tickers, data_dict, company_names, data
 
 def filter_extreme_values(metrics_df, SPREAD=1.8):
@@ -109,7 +103,7 @@ def filter_extreme_values(metrics_df, SPREAD=1.8):
 def compute_stock_metrics(tickers, start_date, end_date):
     valid_tickers, data_dict, company_names, data = check_tickers_fetching(tickers, start_date, end_date)
     daily_returns = data.pct_change()
-    print("hello")
+    
     metrics_df = pd.DataFrame({
         "Stock_Ticker": valid_tickers,
         "Company_Name": company_names,
@@ -117,11 +111,9 @@ def compute_stock_metrics(tickers, start_date, end_date):
         "Annual_Volatility%": daily_returns.std() * np.sqrt(252) * 100
     })
     
-    # Apply filter_extreme_values
-    metrics_df = filter_extreme_values(metrics_df)
+    metrics_df = filter_extreme_values(metrics_df) # Apply filter_extreme_values
     
-    # Remove rows with any NaN values
-    metrics_df = metrics_df.dropna()
+    metrics_df = metrics_df.dropna() # Remove rows with any NaN values
     
     # Recalculate correlation and covariance matrices with clean data
     clean_daily_returns = daily_returns[metrics_df["Stock_Ticker"]]
@@ -216,7 +208,7 @@ def finalize_plot(ax, filename, legend=True, legend_title=None, tight_layout=Tru
             ax.legend(fontsize=10, loc="best", frameon=True, fancybox=True, framealpha=0.6)
     if tight_layout:
         plt.tight_layout()
-    plt.savefig(f'./plots/{filename}.png')
+    plt.savefig(f'{PATH_TO_PLOTS}{filename}.png')
     plt.show()
 
 def fetch_and_convert_data(tickers, start_date, end_date, base_currency="USD"):
@@ -359,8 +351,9 @@ def compute_fama_french_3_factors(portfolio_returns, ff3_factors, portfolio_name
     portfolio_excess_returns = portfolio_returns - ff3_factors['RF']
     
     X = sm.add_constant(ff3_factors[['MKT-RF', 'SMB', 'HML']])
+
     model = sm.OLS(portfolio_excess_returns, X).fit()
-    print(model.summary())
+    #print(model.summary()) #withdraw the '#' before the print if you want to access to OLS Regression Results
 
     factors = ['Alpha (Intercept)', 'MKT-RF', 'SMB', 'HML']
     coefficients = model.params
@@ -378,7 +371,7 @@ def compute_fama_french_3_factors(portfolio_returns, ff3_factors, portfolio_name
             color="red", linestyle="--", label="45° Line")
     finalize_plot(ax, "fama_french_3_fig2")
 
-    print("\n=== Fama-French Factor Ratios ===")
+    print("\n\n=== Fama-French Factor Ratios ===\n")
     factor_stats = pd.DataFrame({
         'Mean': ff3_factors.mean(),
         'Std Dev': ff3_factors.std(),
@@ -439,55 +432,50 @@ def plot_sml_with_dynamic_gmvp(metrics_df, gmvp_weights, market_ticker='URTH', s
 
 
 def evaluate_gmvp_performance(gmvp_weights, gmvp_return, gmvp_volatility, cov_matrix, risk_free_rate, market_ticker, start_date, end_date, data, tickers):
-    # Fetch market data
-    market_data = yf.download(market_ticker, start=start_date, end=end_date, progress=False)["Adj Close"]
-    
-    # Calculate returns
-    market_log_returns = pd.Series(np.log(market_data / market_data.shift(1)).dropna(), name="Market")
-    log_returns = np.log(data / data.shift(1)).dropna()
-    
-    # Join market and portfolio returns
-    aligned_data = log_returns.join(market_log_returns, how="inner").dropna()
-    
-    # Calculate market metrics
-    market_variance = aligned_data["Market"].var()
-    if market_variance == 0 or np.isnan(market_variance):
-        return {"Error": "Market returns variance is zero or invalid."}
-    
-    # Calculate portfolio beta
-    betas = aligned_data.cov().loc[tickers, "Market"] / market_variance
-    portfolio_beta = np.dot(gmvp_weights, betas)
-    
-    # Calculate annualized market metrics
-    annualized_market_return = np.exp(market_log_returns.mean() * 252) - 1
-    annualized_market_volatility = market_log_returns.std() * np.sqrt(252)
-    
-    # Calculate Jensen's Alpha
-    jensens_alpha = gmvp_return - (risk_free_rate + portfolio_beta * (annualized_market_return - risk_free_rate))
-    
-    # Compile performance metrics
-    performance_metrics = {
-        "GMVP Annualized Return (%)": gmvp_return * 100,
-        "GMVP Annualized Volatility (%)": gmvp_volatility * 100,
-        "GMVP Sharpe Ratio": (gmvp_return - risk_free_rate) / gmvp_volatility,
-        "GMVP Beta": portfolio_beta,
-        "GMVP Jensen's Alpha": jensens_alpha,
-        "Market Annualized Return (%)": annualized_market_return * 100,
-        "Market Annualized Volatility (%)": annualized_market_volatility * 100
-    }
-    
-    print("\n=== GMVP Performance Metrics ===")
-    for key, value in performance_metrics.items():
-        print(f"{key}: {value:.4f}" if isinstance(value, (float, int)) else f"{key}: {value}")
-    
-    return performance_metrics
+    try:
+        market_data = yf.download(market_ticker, start=start_date, end=end_date, progress=False)["Adj Close"]
+        if market_data.empty:
+            return {"Error": "Market data is empty."}
 
+        market_log_returns = np.log(market_data / market_data.shift(1)).dropna()
+        log_returns = np.log(data / data.shift(1)).dropna()
 
-def new_func(market_log_returns, log_returns):
-    aligned_data = log_returns.join(market_log_returns.rename("Market"), how="inner").dropna()
-    return aligned_data
+        # Ensure one-dimensionality
+        if len(log_returns.shape) > 1:
+            log_returns = log_returns.squeeze()
+        if len(market_log_returns.shape) > 1:
+            market_log_returns = market_log_returns.squeeze()
 
+        aligned_data = log_returns.join(market_log_returns.rename("Market"), how="inner").dropna()
 
+        market_variance = aligned_data["Market"].var()
+        if market_variance == 0 or np.isnan(market_variance):
+            return {"Error": "Market returns variance is zero or invalid."}
+
+        # Calculate portfolio beta
+        betas = aligned_data.cov().loc[tickers, "Market"] / market_variance
+        portfolio_beta = np.dot(gmvp_weights, betas)
+       
+        annualized_market_return = ((1 + market_log_returns.mean()) ** 252) - 1
+
+        annualized_market_volatility = market_log_returns.std() * np.sqrt(252)
+        jensens_alpha = gmvp_return - (risk_free_rate + portfolio_beta * (annualized_market_return - risk_free_rate))
+
+        # Compile performance metrics
+        performance_metrics = {
+            "GMVP Annualized Return (%)": gmvp_return * 100,
+            "GMVP Annualized Volatility (%)": gmvp_volatility * 100,
+            "GMVP Sharpe Ratio": (gmvp_return - risk_free_rate) / gmvp_volatility,
+            "GMVP Beta": portfolio_beta,
+            "GMVP Jensen's Alpha": jensens_alpha,
+            "Market Annualized Return (%)": annualized_market_return * 100,
+            "Market Annualized Volatility (%)": annualized_market_volatility * 100
+        }
+
+        return performance_metrics
+    except Exception as e:
+        print(f"Error in performance evaluation: {e}")
+        return {}
 
 def main():
     stock_metrics = compute_stock_metrics(TICKERS, START_DATE, END_DATE)
@@ -496,7 +484,6 @@ def main():
     correlation_matrix = stock_metrics["Correlation_Matrix"]
     cov_matrix = stock_metrics["Covariance_Matrix"]
     data = stock_metrics['Raw Data']
-    print(metrics_df)
     if metrics_df.empty:
         print("No valid stocks remaining after filtering.")
         return
@@ -514,10 +501,10 @@ def main():
         print("\n\n===== NEOMA WORLD GROWTH PORTFOLIO =====")
         print(f"\n*Please note that the following data is for the period from {START_DATE} to {END_DATE}.")
         
-        print("\nTicker    Return (%)     Volatility (%)")
-        print("-" * 45)
-        for ticker, ret, vol in zip(tickers, returns * 100, metrics_df['Annual_Volatility%']):
-            print(f"{ticker:<10}{ret:<15.2f}{vol:<20.2f}")
+        print("\nTicker    Return (%)     Volatility (%)    Company Name")
+        print("-" * 70)
+        for ticker, ret, vol, name in zip(tickers, returns * 100, metrics_df['Annual_Volatility%'], metrics_df['Company_Name']):
+            print(f"{ticker:<10}{ret:<15.2f}{vol:<20.2f}{name:<23}")
 
         print("\n\n=== Correlation Matrix ===\n")
         print(pd.DataFrame(correlation_matrix, index=tickers, columns=tickers))
@@ -537,21 +524,23 @@ def main():
             "Stock_volatility%": metrics_df["Annual_Volatility%"]
         })
 
-        '''
-        evaluate_gmvp_performance(
-            gmvp_weights=gmvp_weights,
-            gmvp_return=gmvp_return,
-            gmvp_volatility=gmvp_volatility,
-            cov_matrix=cov_matrix,
-            risk_free_rate=RISK_FREE_RATE,
-            market_ticker="URTH",
-            start_date=START_DATE,
-            end_date=END_DATE,
-            data=data,
-            tickers=tickers
-        )
-        '''
-
+        performance_metrics = evaluate_gmvp_performance(
+        gmvp_weights=gmvp_weights,
+        gmvp_return=gmvp_return,
+        gmvp_volatility=gmvp_volatility,
+        cov_matrix=cov_matrix,
+        risk_free_rate=RISK_FREE_RATE,
+        market_ticker="URTH",
+        start_date=START_DATE,
+        end_date=END_DATE,
+        data=data,
+        tickers=tickers
+        )   
+        
+        print("\n=== GMVP Performance Metrics ===\n")
+        for key, value in performance_metrics.items():
+            print(f"{key}: {value:.4f}" if isinstance(value, (float, int)) else f"{key}: {value}")
+        
         plot_correlation_heatmap(correlation_matrix, tickers, title="Correlation Heatmap for Selected Stocks")
         
         plot_return_vs_risk_portfolio_GMVP_MSR(
@@ -580,9 +569,10 @@ def main():
         
         portfolio_daily_returns = metrics_df['Annual_Return%'] / 252
         portfolio_returns = pd.Series(portfolio_daily_returns.values, index=pd.date_range(start=START_DATE, periods=len(portfolio_daily_returns), freq='B'))
-        #compute_fama_french_3_factors(portfolio_returns, fetch_fama_french_factors(START_DATE, END_DATE), portfolio_name="Sample Portfolio")
+        
+        compute_fama_french_3_factors(portfolio_returns, fetch_fama_french_factors(START_DATE, END_DATE), portfolio_name="Sample Portfolio")
        
-        #plot_sml_with_dynamic_gmvp(metrics_df, gmvp_weights, start_date=START_DATE, end_date=END_DATE, market_ticker='URTH')
+        plot_sml_with_dynamic_gmvp(metrics_df, gmvp_weights, start_date=START_DATE, end_date=END_DATE, market_ticker='URTH')
         
         print(f"\nProject NEOMA Business School - MSc International Finance, FMRM Track")
     except ValueError as e:
