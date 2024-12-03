@@ -18,6 +18,7 @@ import logging
 import yfinance as yf
 import numpy as np
 import pandas as pd
+import os
 import json
 from datetime import datetime
 import scipy.optimize as sco
@@ -39,6 +40,25 @@ logging.basicConfig(
         logging.StreamHandler()  # Log to console (optional)
     ]
 )
+
+def create_config_file(file_path="config.json"):
+    #Default parameters to include in the config.json file
+    default_config = {
+        "tickers": ["AAPL", "MSFT", "GOOGL"],  
+        "start_date": "2020-01-01",           
+        "end_date": None,                     
+        "risk_free_rate": 0.05,               
+        "output_path": "./plots/",            
+        "base_currency": "USD"                
+    }
+    if not os.path.exists(file_path): #checks if config.json exists and creates a fresh one if needed
+        with open(file_path, "w") as file:
+            json.dump(default_config, file, indent=4)
+        print(f"Configuration file created at: {os.path.abspath(file_path)}")
+        print("Modify this file to update tickers, dates, or other parameters.")
+    else:
+        print(f"Configuration file already exists at: {os.path.abspath(file_path)}")
+
 
 def load_config(config_file="config.json"):
     """
@@ -64,6 +84,7 @@ def load_config(config_file="config.json"):
     except json.JSONDecodeError as e:
         raise ValueError(f"Error parsing JSON configuration file: {e}")
 
+create_config_file()
 config = load_config()
 
 # Constants
@@ -74,6 +95,17 @@ RISK_FREE_RATE = config["risk_free_rate"]
 PATH_TO_PLOTS = config["output_path"]
 BASE_CURRENCY = config["base_currency"]
 
+def check_or_create_plots_folder(folder="plots"):
+    if os.path.exists(folder):
+        if os.path.isdir(folder):
+            print(f"Folder '{folder}' already exists.")
+        else:
+            print(f"A file named '{folder}' exists, but it's not a folder. Please rename or remove it.")
+    else:
+        os.makedirs(folder)
+        print(f"Folder '{folder}' created successfully.")
+
+check_or_create_plots_folder(PATH_TO_PLOTS)
 import sys
 import subprocess
 
