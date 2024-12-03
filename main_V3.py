@@ -31,6 +31,14 @@ warnings.filterwarnings("ignore", category=RuntimeWarning) #Use to avoid Warning
 warnings.filterwarnings("ignore", category=FutureWarning)
 warnings.filterwarnings("ignore", category=UserWarning)
 
+logging.basicConfig(
+    level=logging.INFO,  # Set the minimum severity level to INFO
+    format='%(asctime)s - %(levelname)s - %(message)s',  # Customize log message format
+    handlers=[
+        logging.FileHandler("portfolio_optimization.log"),  # Log to a file
+        logging.StreamHandler()  # Log to console (optional)
+    ]
+)
 
 def load_config(config_file="config.json"):
     """
@@ -122,7 +130,7 @@ def fetch_stock_data(ticker, start_date, end_date):
         data = yf.download(ticker, start=start_date, end=end_date, progress=False)['Adj Close']
         return data if not data.empty else None
     except Exception as e:
-        print(f"Error fetching data for {ticker}: {e}")
+        logging.error(f"Error fetching data for {ticker}: {e}")
         return None
 
 def get_company_name(ticker):
@@ -138,6 +146,7 @@ def get_company_name(ticker):
     try:
         return yf.Ticker(ticker).info.get('shortName', ticker)
     except Exception:
+        logging.error(f'Error running get_company_name for {ticker}')
         return ticker
 
 def check_tickers_fetching(tickers, start_date, end_date):
@@ -444,8 +453,7 @@ def fetch_and_convert_data(tickers, start_date, end_date, base_currency="USD"):
             else:
                 print(f"No data or missing conversion rate for {ticker}. Skipping...")
         except Exception as e:
-            print(f"Error processing {ticker}: {e}")
-    
+            logging.error(f"Error processing {ticker}: {e}") 
     return data_dict
 
 
@@ -535,7 +543,6 @@ def plot_gmvp_msr_weights(tickers, company_names, gmvp_weights, msr_weights, gmv
     
     ax.set_xticks(x)
     ax.set_xticklabels(labels, fontsize=10, rotation=45, ha='right')
-    
     finalize_plot(ax,"Gmvp_msr_weights")
 
 def plot_return_vs_risk_portfolio_GMVP_MSR(stock_df, simulated_returns, simulated_volatilities, simulated_sharpe_ratios,
@@ -737,7 +744,7 @@ def plot_sml_with_dynamic_gmvp(metrics_df, gmvp_weights, market_ticker='URTH', s
         ax.legend(loc='best', fontsize=8)   # Adjust legend
         finalize_plot(ax, "sml_with_dynamic_gmvp")
     except Exception as e:
-        print(f"Error in plot_sml_with_dynamic_gmvp: {e}")
+        logging.error(f"Error in plot_sml_with_dynamic_gmvp: {e}")
 
 def evaluate_gmvp_performance(gmvp_weights, gmvp_return, gmvp_volatility, cov_matrix, risk_free_rate, market_ticker, start_date, end_date, data, tickers):
     """
@@ -800,7 +807,7 @@ def evaluate_gmvp_performance(gmvp_weights, gmvp_return, gmvp_volatility, cov_ma
 
         return performance_metrics
     except Exception as e:
-        print(f"Error in performance evaluation: {e}")
+        logging.error(f"Error in performance evaluation: {e}")
         return {}
 
 def main():
@@ -814,71 +821,76 @@ def main():
     Outputs:
         Results and visualizations in the console and saved files.
     """
-    stock_metrics = compute_stock_metrics(TICKERS, START_DATE, END_DATE)
-    
-    metrics_df = stock_metrics["Metrics_DataFrame"]
-    correlation_matrix = stock_metrics["Correlation_Matrix"]
-    cov_matrix = stock_metrics["Covariance_Matrix"]
-    data = stock_metrics['Raw Data']
-    if metrics_df.empty:
-        print("No valid stocks remaining after filtering.")
-        return
-
-    returns = metrics_df["Annual_Return%"].values / 100
-    tickers = metrics_df["Stock_Ticker"].values
-
     try:
+        # Step 1: Compute stock metrics
+        stock_metrics = compute_stock_metrics(TICKERS, START_DATE, END_DATE)
+        metrics_df = stock_metrics["Metrics_DataFrame"]
+        correlation_matrix = stock_metrics["Correlation_Matrix"]
+        cov_matrix = stock_metrics["Covariance_Matrix"]
+        data = stock_metrics['Raw Data']
+
+        if metrics_df.empty:
+            print("No valid stocks remaining after filtering.")
+            return
+
+        # Extract necessary values
+        returns = metrics_df["Annual_Return%"].values / 100
+        tickers = metrics_df["Stock_Ticker"].values
+
+        # Step 2: Portfolio Optimization
         gmvp_weights, gmvp_volatility = optimize_portfolio(returns, cov_matrix, "GMVP")
         gmvp_return = np.dot(gmvp_weights, returns)
 
         msr_weights, _ = optimize_portfolio(returns, cov_matrix, "MSR")
         msr_return, msr_volatility, _ = portfolio_metrics(msr_weights, returns, cov_matrix)
 
+        # Print Basic Portfolio Results
         print("\n\n===== NEOMA WORLD GROWTH PORTFOLIO =====")
-        print(f"\n*Please note that the following data is for the period from {START_DATE} to {END_DATE}.")
-        
+        print(f"\n*Data period: {START_DATE} to {END_DATE}\n")
         print("\nTicker    Return (%)     Volatility (%)    Company Name")
         print("-" * 70)
-        for ticker, ret, vol, name in zip(tickers, returns * 100, metrics_df['Annual_Volatility%'], metrics_df['Company_Name']):
+        for ticker, ret, vol, name in zip(
+            tickers, returns * 100, metrics_df['Annual_Volatility%'], metrics_df['Company_Name']
+        ):
             print(f"{ticker:<10}{ret:<15.2f}{vol:<20.2f}{name:<23}")
 
-        print("\n\n=== Correlation Matrix ===\n")
-        print(pd.DataFrame(correlation_matrix, index=tickers, columns=tickers))
-
+        # Print Optimization Results
         print("\n\n=== Portfolio Metrics ===")
         print(f"\nGMVP Return: {gmvp_return * 100:.2f}%, GMVP Volatility: {gmvp_volatility * 100:.2f}%")
         print_portfolio_weights(gmvp_weights, tickers)
         print(f"\n\nMSR Return: {msr_return * 100:.2f}%, MSR Volatility: {msr_volatility * 100:.2f}%")
         print_portfolio_weights(msr_weights, tickers)
 
+        # Step 3: Performance Evaluation
+        performance_metrics = evaluate_gmvp_performance(
+            gmvp_weights=gmvp_weights,
+            gmvp_return=gmvp_return,
+            gmvp_volatility=gmvp_volatility,
+            cov_matrix=cov_matrix,
+            risk_free_rate=RISK_FREE_RATE,
+            market_ticker="URTH",
+            start_date=START_DATE,
+            end_date=END_DATE,
+            data=data,
+            tickers=tickers,
+        )
+
+        print("\n=== GMVP Performance Metrics ===\n")
+        for key, value in performance_metrics.items():
+            print(f"{key}: {value:.4f}" if isinstance(value, (float, int)) else f"{key}: {value}")
+
+        # Step 4: Generate Plots
+        plot_correlation_heatmap(correlation_matrix, tickers, title="Correlation Heatmap for Selected Stocks")
+
         efficient_returns, efficient_volatilities = calculate_efficient_frontier(returns, cov_matrix)
         simulated_returns, simulated_volatilities, simulated_sharpe_ratios = simulate_portfolios(returns, cov_matrix)
-        
+
         stock_df = pd.DataFrame({
             "Stock_name": metrics_df['Stock_Ticker'],
             "Stock_return%": metrics_df['Annual_Return%'],
             "Stock_volatility%": metrics_df["Annual_Volatility%"]
         })
-        
-        performance_metrics = evaluate_gmvp_performance(
-        gmvp_weights=gmvp_weights,
-        gmvp_return=gmvp_return,
-        gmvp_volatility=gmvp_volatility,
-        cov_matrix=cov_matrix,
-        risk_free_rate=RISK_FREE_RATE,
-        market_ticker="URTH",
-        start_date=START_DATE,
-        end_date=END_DATE,
-        data=data,
-        tickers=tickers
-        )   
-        
-        print("\n=== GMVP Performance Metrics ===\n")
-        for key, value in performance_metrics.items():
-            print(f"{key}: {value:.4f}" if isinstance(value, (float, int)) else f"{key}: {value}")
-        
-        plot_correlation_heatmap(correlation_matrix, tickers, title="Correlation Heatmap for Selected Stocks")
-        
+
         plot_return_vs_risk_portfolio_GMVP_MSR(
             stock_df,
             simulated_returns,
@@ -889,31 +901,34 @@ def main():
             msr_return,
             msr_volatility,
             gmvp_return,
-            gmvp_volatility
+            gmvp_volatility,
         )
-        
+
         plot_gmvp_msr_weights(
-            metrics_df['Stock_Ticker'],
+            tickers,
             metrics_df['Company_Name'],
             gmvp_weights,
             msr_weights,
             (gmvp_return, gmvp_volatility),
-            (msr_return, msr_volatility)
+            (msr_return, msr_volatility),
         )
-        
-        plot_historical_prices(metrics_df, START_DATE, END_DATE, base_currency="USD", title="Historical Prices in USD")
-        
-        portfolio_daily_returns = metrics_df['Annual_Return%'] / 252
-        portfolio_returns = pd.Series(portfolio_daily_returns.values, index=pd.date_range(start=START_DATE, periods=len(portfolio_daily_returns), freq='B'))
-        
-        compute_fama_french_3_factors(portfolio_returns, fetch_fama_french_factors(START_DATE, END_DATE), portfolio_name="Sample Portfolio")
-        
-        plot_sml_with_dynamic_gmvp(metrics_df, gmvp_weights, start_date=START_DATE, end_date=END_DATE, market_ticker='URTH')
-        
 
-        print(f"\nProject NEOMA Business School - MSc International Finance, FMRM Track")
-    except ValueError as e:
-        print(f"Optimization failed: {e}. Check input data or constraints.")
+        plot_historical_prices(metrics_df, START_DATE, END_DATE, base_currency="USD", title="Historical Prices in USD")
+
+        # Step 5: Fama-French Analysis
+        portfolio_daily_returns = metrics_df['Annual_Return%'] / 252
+        portfolio_returns = pd.Series(
+            portfolio_daily_returns.values, index=pd.date_range(start=START_DATE, periods=len(portfolio_daily_returns), freq='B')
+        )
+
+        ff3_factors = fetch_fama_french_factors(START_DATE, END_DATE)
+        compute_fama_french_3_factors(portfolio_returns, ff3_factors, portfolio_name="Sample Portfolio")
+
+        plot_sml_with_dynamic_gmvp(metrics_df, gmvp_weights, start_date=START_DATE, end_date=END_DATE, market_ticker='URTH')
+
+        print(f"\n - Project NEOMA Business School - MSc International Finance, FMRM Track - \n")
+    except Exception as e:
+        logging.error(f"An error occurred during execution: {e}")
 
 if __name__ == "__main__":
     main()
