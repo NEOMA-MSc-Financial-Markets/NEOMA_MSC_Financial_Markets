@@ -2,19 +2,11 @@
 
 <img width="967" alt="Screenshot 2024-12-02 at 18 10 47" src="https://github.com/user-attachments/assets/063a1e99-7878-41d5-b6a0-8e880ab636ad">
 
-Collaborators : 
+-
 
-Adrien PICARD 					Constance BERRAUTE				Louis DELACOUR		
-adrien.picard.23@neoma-bs.com			constance.berraute.21@neoma-bs.com		louis.delacour.21@neoma-bs.com
-MSc Financial Markets & Risk Management		MSc Financial Markets & Risk Management		MSc Financial Markets & Risk Management
+This Python project implements a comprehensive portfolio optimization tool for a 5-stock portfolio (could be used for 2 stocks to 200). It fetches historical data, calculates key metrics like GMVP and MSR, and visualizes results. The script incorporates advanced concepts such as Fama-French 3-factor model, efficient frontier, and SML analysis, making it suitable for asset-management.
 
-Lucas MOERLEN					Sacha DIDUCH
-lucas.moerlen.21@neoma-bs.com			sacha.diduch.24@neoma-bs.com
-MSc Financial Markets & Risk Management		MSc Financial Markets & Risk Management
-
-
-This Python project implements a comprehensive portfolio optimization tool for a 5-stock portfolio. It fetches historical data, calculates key metrics like GMVP and MSR, and visualizes results. The script incorporates advanced concepts such as Fama-French 3-factor model, efficient frontier, and SML analysis, making it suitable for asset-management.
-
+-
 
 NEOMA World Growth Portfolio (NWGP) Optimization Tool
 
@@ -141,5 +133,23 @@ Note : This tool is designed for educational and research purposes in the contex
 Author
 	
  	Adrien PICARD - picard.adrien@icloud.com
+
+Collaborators from MSc Financial Markets & Risk Management :
+
+	Adrien PICARD 										
+	adrien.picard.23@neoma-bs.com					
+
+	Constance BERRAUTE
+	constance.berraute.21@neoma-bs.com
+
+	Louis DELACOUR
+	louis.delacour.21@neoma-bs.com
+
+	Lucas MOERLEN				
+	lucas.moerlen.21@neoma-bs.com	
+
+	Sacha DIDUCH
+	sacha.diduch.24@neoma-bs.com
+
 
 License : This project is open-source and available under the MIT License.
