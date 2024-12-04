@@ -2,7 +2,19 @@
 
 <img width="967" alt="Screenshot 2024-12-02 at 18 10 47" src="https://github.com/user-attachments/assets/063a1e99-7878-41d5-b6a0-8e880ab636ad">
 
+Collaborators : 
+
+Adrien PICARD 					Constance BERRAUTE				Louis DELACOUR		
+adrien.picard.23@neoma-bs.com			constance.berraute.21@neoma-bs.com		louis.delacour.21@neoma-bs.com
+MSc Financial Markets & Risk Management		MSc Financial Markets & Risk Management		MSc Financial Markets & Risk Management
+
+Lucas MOERLEN					Sacha DIDUCH
+lucas.moerlen.21@neoma-bs.com			sacha.diduch.24@neoma-bs.com
+MSc Financial Markets & Risk Management		MSc Financial Markets & Risk Management
+
+
 This Python project implements a comprehensive portfolio optimization tool for a 5-stock portfolio. It fetches historical data, calculates key metrics like GMVP and MSR, and visualizes results. The script incorporates advanced concepts such as Fama-French 3-factor model, efficient frontier, and SML analysis, making it suitable for asset-management.
+
 
 NEOMA World Growth Portfolio (NWGP) Optimization Tool
 
@@ -39,51 +51,42 @@ Key Features
 
 Requirements
 
-	•	Python 3.11 (This code won't work in python3.12 env)
-	•	Dependencies: yfinance, numpy, pandas, scipy, matplotlib, seaborn, statsmodels
+	•	Python 3.11 or newer
+	•	Dependencies: yfinance, numpy, pandas, scipy, matplotlib, seaborn, statsmodels (requirements.txt)
+
+Installation and Setup
+
+	Clone the repository or download the script.
+
+Create a virtual environment:
+
+	python3 -m venv portfolio_env
+
+Activate the virtual environment:
+	
+ 	On Windows: portfolio_env\Scripts\activate
+	On macOS and Linux: source portfolio_env/bin/activate
+
+Install required packages:
+
+	pip install yfinance numpy pandas scipy matplotlib seaborn statsmodels pandas_datareader
+
 Usage
 
-	1.	Configure TICKERS, START_DATE, END_DATE, and RISK_FREE_RATE constants in the script.
-	2.	Execute the script: python portfolio_analysis.py
-	3.	Follow prompts to include/exclude stocks with extreme values.
-
-Running the Project
-
-To simplify the setup process and ensure all dependencies are correctly installed, we've provided a bash script that creates a virtual environment, installs the required packages, and runs the main Python script. Follow these steps to use it:
-Make sure you have Python 3.11 installed on your system.
-
-Save the following script as run_portfolio_optimization.sh in the same directory as your main_portfolio_optimization.py file:
-bash
-
-	#!/bin/bash
-
-	# Create a virtual environment
-	python3.11 -m venv portfolio_env
-
-	# Activate the virtual environment
-	source portfolio_env/bin/activate
-
-	# Upgrade pip
-	pip install --upgrade pip
-
-	# Install required libraries
-	pip install yfinance numpy pandas scipy matplotlib seaborn statsmodels pandas-datareader
-
-	# Run the Python script
-	python3.11 main_portfolio_optimization.py
-
-	# Deactivate the virtual environment
-	deactivate
-
-Make the script executable by running:
-
-	chmod +x run_portfolio_optimization.sh
+Configure the portfolio parameters in the config.json file:
+	
+ 	tickers: List of stock tickers
+	start_date: Start date for historical data
+	end_date: End date for historical data (optional, defaults to current date)
+	risk_free_rate: Risk-free rate for calculations
+	output_path: Directory for saving output plots
+	base_currency: Base currency for conversions
 
 Run the script:
 
-	./run_portfolio_optimization.sh
+	python portfolio_optimization.py
 
-This script will create a virtual environment, install all necessary dependencies, run the main Python script, and then deactivate the virtual environment.
+Follow any prompts to include/exclude stocks with extreme values.
 
 Note: If you're using Windows, you'll need to modify the script or use a bash emulator like Git Bash to run this script.
 
@@ -104,7 +107,6 @@ Printing in terminal :
 
 <img width="653" alt="Screenshot 2024-12-02 at 19 17 56" src="https://github.com/user-attachments/assets/d109d002-80c4-4813-8358-4dac93f3bd80">
 <img width="523" alt="Screenshot 2024-12-02 at 19 18 17" src="https://github.com/user-attachments/assets/82b76d56-53a8-4f11-b240-06c24f47b052">
-
 
 
 The script generates a series of plots and prints detailed portfolio metrics, including:
@@ -130,7 +132,14 @@ Heatmap Correlation Matrix
 ![Figure 2024-12-02 191338](https://github.com/user-attachments/assets/1711b5e0-981f-40af-ab97-ae036b1f2393)
 
 
-Note
-This report, created by NEOMA Business School students for the Financial Data Analytics & Programming course, is for educational and research purposes in the context of advanced financial analysis and portfolio management purposes only. It is hypothetical and does not constitute financial or investment advice or an invitation to invest.
+Customization
+	
+  	You can easily customize the portfolio by modifying the config.json file. Add or remove tickers, adjust dates, or change the risk-free rate to suit your analysis needs.
 
-AUTHOR : Adrien PICARD - picard.adrien@icloud.com
+Note : This tool is designed for educational and research purposes in the context of advanced financial analysis and portfolio management. It does not constitute financial or investment advice.
+
+Author
+	
+ 	Adrien PICARD - picard.adrien@icloud.com
+
+License : This project is open-source and available under the MIT License.
