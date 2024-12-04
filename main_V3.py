@@ -45,12 +45,12 @@ logging.basicConfig(
 def create_config_file(file_path="config.json"):
     #Default parameters to include in the config.json file
     default_config = {
-        "tickers": ["AAPL", "MSFT", "GOOGL"],  
-        "start_date": "2020-01-01",           
-        "end_date": None,                     
-        "risk_free_rate": 0.05,               
-        "output_path": "./plots/",            
-        "base_currency": "USD"                
+        "tickers": ["ML.PA", "HDB", "CEG", "RTX", "8031.T"],
+        "start_date": "2019-01-01",
+        "end_date": null,
+        "risk_free_rate": 0.05,
+        "output_path": "./plots/",
+        "base_currency": "USD"              
     }
     if not os.path.exists(file_path): #checks if config.json exists and creates a fresh one if needed
         with open(file_path, "w") as file:
@@ -732,7 +732,7 @@ def plot_sml_with_dynamic_gmvp(metrics_df, gmvp_weights, market_ticker='URTH', s
             raise ValueError("No data found for market ticker.")
         
         market_daily_returns = market_data['Adj Close'].pct_change().dropna()
-        market_annual_return = ((1 + market_daily_returns.mean()) ** 252) - 1
+        market_annual_return = float(((1 + market_daily_returns.mean()) ** 252) - 1)
 
         # Calculate betas for stocks
         stock_betas = []
@@ -751,12 +751,9 @@ def plot_sml_with_dynamic_gmvp(metrics_df, gmvp_weights, market_ticker='URTH', s
         gmvp_beta = np.dot(gmvp_weights, metrics_df['Beta'])
         gmvp_return = np.dot(gmvp_weights, metrics_df['Annual_Return%']) / 100
 
-        # Extract the scalar value from market_annual_return
-        market_annual_return_value = market_annual_return.iloc[0]
-
         # Prepare data for SML
         betas = np.linspace(-0.5, 2.5, 100)
-        sml_returns = RISK_FREE_RATE + betas * (market_annual_return_value - RISK_FREE_RATE)
+        sml_returns = RISK_FREE_RATE + betas * (market_annual_return - RISK_FREE_RATE)
 
         # Plot SML
         ax = create_plot(title="Security Market Line (SML) with GMVP", xlabel="Beta (Systematic Risk)", ylabel="Expected Return (%)")
