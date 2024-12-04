@@ -87,8 +87,17 @@ def load_config(config_file="config.json"):
 create_config_file()
 config = load_config()
 
+def remove_duplicates(strings: list[str]) -> list[str]:
+    seen = set()
+    unique_strings = []
+    for string in strings:
+        if string not in seen:
+            unique_strings.append(string)
+            seen.add(string)
+    return unique_strings
+
 # Constants
-TICKERS = config["tickers"]
+TICKERS = remove_duplicates(config["tickers"])
 START_DATE = config["start_date"]
 END_DATE = config["end_date"]
 RISK_FREE_RATE = config["risk_free_rate"]
