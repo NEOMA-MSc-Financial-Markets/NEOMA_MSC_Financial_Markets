@@ -138,7 +138,7 @@ install_requirements
 check_and_install_python_packages
 
 # Run the Python script
-echo "Running the Python script main_V3.py..."
-python3.12 main_V3.py
+echo "Running the Python script portfolio_optimization.py..."
+python3.12 portfolio_optimization.py
 
 echo "Execution completed."
