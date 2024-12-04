@@ -27,6 +27,7 @@ import seaborn as sns
 import statsmodels.api as sm
 from pandas_datareader import data as pdr
 import warnings
+import xlsxwriter
 
 warnings.filterwarnings("ignore", category=RuntimeWarning) #Use to avoid Warnings and Noisy printings from the algos
 warnings.filterwarnings("ignore", category=FutureWarning)
@@ -851,6 +852,44 @@ def evaluate_gmvp_performance(gmvp_weights, gmvp_return, gmvp_volatility, cov_ma
         logging.error(f"Error in performance evaluation: {e}")
         return {}
 
+def export_to_excel(metrics_df, gmvp_weights, msr_weights, gmvp_performance, msr_performance, performance_metrics, filename="portfolio_results.xlsx"):
+    """
+    Exports portfolio results and metrics to an Excel file.
+
+    Args:
+        metrics_df (pd.DataFrame): DataFrame containing stock metrics.
+        gmvp_weights (np.ndarray): Weights for the GMVP portfolio.
+        msr_weights (np.ndarray): Weights for the MSR portfolio.
+        gmvp_performance (tuple): GMVP return and volatility.
+        msr_performance (tuple): MSR return and volatility.
+        performance_metrics (dict): Performance metrics of the GMVP.
+        filename (str, optional): Name of the output Excel file. Defaults to "portfolio_results.xlsx".
+    """
+    with pd.ExcelWriter(filename, engine="xlsxwriter") as writer:
+        # Save stock metrics
+        metrics_df.to_excel(writer, sheet_name="Stock Metrics", index=False)
+
+        # Save GMVP and MSR weights
+        pd.DataFrame({
+            "Ticker": metrics_df["Stock_Ticker"],
+            "Company Name": metrics_df["Company_Name"],
+            "GMVP Weight (%)": gmvp_weights * 100,
+            "MSR Weight (%)": msr_weights * 100,
+        }).to_excel(writer, sheet_name="Portfolio Weights", index=False)
+
+        # Save GMVP and MSR performance
+        performance_data = {
+            "Metric": ["GMVP Return (%)", "GMVP Volatility (%)", "MSR Return (%)", "MSR Volatility (%)"],
+            "Value": [gmvp_performance[0] * 100, gmvp_performance[1] * 100, msr_performance[0] * 100, msr_performance[1] * 100],
+        }
+        pd.DataFrame(performance_data).to_excel(writer, sheet_name="Portfolio Performance", index=False)
+
+        # Save GMVP additional performance metrics
+        pd.DataFrame(list(performance_metrics.items()), columns=["Metric", "Value"]).to_excel(writer, sheet_name="Performance Metrics", index=False)
+
+    print(f"\nResults exported to {filename}")
+
+
 def main():
     """
     Executes the end-to-end portfolio optimization and analysis workflow:
@@ -966,6 +1005,16 @@ def main():
         compute_fama_french_3_factors(portfolio_returns, ff3_factors, portfolio_name="Sample Portfolio")
 
         plot_sml_with_dynamic_gmvp(metrics_df, gmvp_weights, start_date=START_DATE, end_date=END_DATE, market_ticker='URTH')
+        
+        export_to_excel(
+        metrics_df=metrics_df,
+        gmvp_weights=gmvp_weights,
+        msr_weights=msr_weights,
+        gmvp_performance=(gmvp_return, gmvp_volatility),
+        msr_performance=(msr_return, msr_volatility),
+        performance_metrics=performance_metrics,
+        filename="portfolio_results.xlsx"
+        )
 
         print(f"\n - Project NEOMA Business School - MSc International Finance, FMRM Track - \n")
     except Exception as e:

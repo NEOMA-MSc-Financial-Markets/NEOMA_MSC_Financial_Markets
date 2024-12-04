@@ -1,5 +1,5 @@
 {
-    "tickers": ["ML.PA", "ML.PA", "HDB", "CEG", "RTX", "8031.T"],
+    "tickers": ["ML.PA", "HDB", "CEG", "RTX", "8031.T"],
     "start_date": "2019-01-01",
     "end_date": null,
     "risk_free_rate": 0.05,
