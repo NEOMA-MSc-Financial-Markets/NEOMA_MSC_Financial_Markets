@@ -1,6 +1,6 @@
 # NEOMA_MSC_Financial_Markets
 
-<img width="967" alt="Screenshot 2024-12-02 at 18 10 47" src="https://github.com/user-attachments/assets/063a1e99-7878-41d5-b6a0-8e880ab636ad">
+<img width="1185" alt="Screenshot 2024-12-06 at 02 11 11" src="https://github.com/user-attachments/assets/4510b059-64f3-4231-a496-67004df8067c">
 
 -
 
