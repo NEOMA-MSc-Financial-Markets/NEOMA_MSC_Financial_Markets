@@ -146,7 +146,7 @@ Collaborators from MSc Financial Markets & Risk Management :
 	louis.delacour.21@neoma-bs.com
 
 	Lucas MOERLEN				
-	lucas.moerlen.21@neoma-bs.com	
+	lucas.moerlen.22@neoma-bs.com	
 
 	Sacha DIDUCH
 	sacha.diduch.24@neoma-bs.com
